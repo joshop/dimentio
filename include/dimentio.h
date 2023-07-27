@@ -9,7 +9,7 @@ typedef struct {
   int v1;
   int v2;
   int v3;
-  COLOR clr;
+  COLOR *clr;
 } POLY;
 typedef struct {
   int num_vecs;

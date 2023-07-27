@@ -44,6 +44,9 @@ typedef u16 COLOR;
 
 #define REG_IME *(volatile s16 *)0x04000208
 
+#define REG_TM0D *(volatile s16 *)0x04000100
+#define REG_TM0CNT *(volatile s16 *)0x04000102
+
 INLINE COLOR RGB15(u32 red, u32 green, u32 blue) {
   return red | (green << 5) | (blue << 10);
 }

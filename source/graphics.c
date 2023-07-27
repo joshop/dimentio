@@ -1,5 +1,6 @@
 #include "asmfunc.h"
 #include "bmp.h"
+#include "dimentio.h"
 #include "helper.h"
 INLINE void plot_pixel(int y, int x, COLOR clr) {
   back_buffer[y * SCREEN_WIDTH + x] = clr;
@@ -73,7 +74,7 @@ void bmp16_line(int y1, int x1, int y2, int x2, u32 clr, void *dstBase,
   t = a;                                                                       \
   a = b;                                                                       \
   b = t
-void draw_span(int x1, int x2, int y, int color) {
+void draw_span(int x1, int x2, int y, COLOR *flex, int rootx, int rooty) {
   int t;
   if (y < 0 || y >= SCREEN_HEIGHT)
     return;
@@ -88,9 +89,23 @@ void draw_span(int x1, int x2, int y, int color) {
   if (x1 > x2) {
     SWAP_T(x1, x2);
   }
-  memset16(back_buffer + (y * SCREEN_WIDTH + x1), color, x2 - x1);
+  if ((u32)flex < 0x10000) {
+    memset16(back_buffer + (y * SCREEN_WIDTH + x1), (u16)flex, x2 - x1);
+    return;
+  }
+  // memset16(back_buffer + (y * SCREEN_WIDTH + x1), color, x2 - x1);
+  // COLOR *flex_point = &(flex[(y - rooty) & 0xf][(x1 - rootx) & 0xf]);
+  COLOR *flex_point =
+      ((COLOR *)flex) + 32 * ((y - rooty) & 0xf) + ((x1 - rootx) & 0xf);
+  int remvals = x2 - x1;
+  while (remvals > 16) {
+    memcpy16(back_buffer + (y * SCREEN_WIDTH + x1), flex_point, 16);
+    x1 += 16;
+    remvals -= 16;
+  }
+  memcpy16(back_buffer + (y * SCREEN_WIDTH + x1), flex_point, remvals);
 }
-void fill_tri(int y1, int x1, int y2, int x2, int y3, int x3, int color) {
+void fill_tri(int y1, int x1, int y2, int x2, int y3, int x3, COLOR *color) {
   int t;
   s32 s1, s2, s3;
   s32 ss, se;
@@ -98,6 +113,7 @@ void fill_tri(int y1, int x1, int y2, int x2, int y3, int x3, int color) {
   int xmid;
   int xa, xb;
   int y;
+  int rootx, rooty;
   if (x1 < -SCREEN_WIDTH || x1 > 2 * SCREEN_WIDTH || x2 < -SCREEN_WIDTH ||
       x2 > 2 * SCREEN_WIDTH || x3 < -SCREEN_WIDTH || x3 > 2 * SCREEN_WIDTH ||
       y1 < -SCREEN_HEIGHT || y1 > 2 * SCREEN_HEIGHT || y2 < -SCREEN_HEIGHT ||
@@ -106,10 +122,12 @@ void fill_tri(int y1, int x1, int y2, int x2, int y3, int x3, int color) {
     // figure out actually why this is necessary, and how to fix it
     return;
   }
-  // envision the triangle as a long side and two short sides
-  // the long side is the one from the top pt to the bottom pt
-  // the other part contains a breakpoint where the direction changes
-  // sort points first, top to bottom
+  rootx = (x1 + x2 + x3) / 3;
+  rooty = (y1 + y2 + y3) / 3;
+  //  envision the triangle as a long side and two short sides
+  //  the long side is the one from the top pt to the bottom pt
+  //  the other part contains a breakpoint where the direction changes
+  //  sort points first, top to bottom
   if (y1 > y2) {
     SWAP_T(x1, x2);
     SWAP_T(y1, y2);
@@ -148,7 +166,7 @@ void fill_tri(int y1, int x1, int y2, int x2, int y3, int x3, int color) {
       // s1 is A to B, that's bad
       // s3 is A to C
       // s2 is B to C
-      draw_span(xa, xb, y, color);
+      draw_span(xa, xb, y, color, rootx, rooty);
       start += (x1 < x2 ? s3 : s2);
       end += (x1 < x2 ? s2 : s3);
       y++;
@@ -182,7 +200,7 @@ void fill_tri(int y1, int x1, int y2, int x2, int y3, int x3, int color) {
     // todo: don't do as much bounds checking
     xa = fixed_int(start);
     xb = fixed_int(end);
-    draw_span(xa, xb, y, color);
+    draw_span(xa, xb, y, color, rootx, rooty);
     start += ss;
     end += se;
     y++;
@@ -190,4 +208,26 @@ void fill_tri(int y1, int x1, int y2, int x2, int y3, int x3, int color) {
   /*draw_line(x1, y1, x2, y2, 191);// 0xe0);
   draw_line(x2, y2, x3, y3, 191);// 0xe0);
   draw_line(x1, y1, x3, y3, 191);// 0xe0);*/
+}
+u32 digits[12] = {0xF999F, 0xF2262, 0xF8F1F, 0xF1F1F, 0x11F99, 0xF1F8F,
+                  0xF9F8F, 0x1111F, 0xF9F9F, 0xF1F9F, 0x88F8F, 0x88F9F};
+void show_digit(int digit, int x, int y) {
+  u32 pattern = digits[digit];
+  for (int i = 0; i < 5; i++) {
+    for (int j = 0; j < 4; j++) {
+      plot_pixel(x - j, y + i, (pattern & 1) ? CLR_WHITE : CLR_BLACK);
+      pattern >>= 1;
+    }
+  }
+}
+void show_number(u32 number, int x, int y) {
+  if (number == 0) {
+    show_digit(0, x, y);
+    return;
+  }
+  while (number) {
+    show_digit(number % 10, x, y);
+    number /= 10;
+    x -= 5;
+  }
 }

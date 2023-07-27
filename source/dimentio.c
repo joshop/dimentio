@@ -70,7 +70,8 @@ int zsort(const void *poly1, const void *poly2) {
   zb3 = VECLIST_BASE[((POLY *)poly2)->v3].z;
   return (zb1 + zb2 + zb3) - (za1 + za2 + za3);
 }
-
+extern COLOR checker_flex[512];
+extern u16 *back_buffer;
 void showtime() {
   qsort(polylist, num_polys, sizeof(POLY), &zsort);
   for (int i = 0; i < num_polys; i++) {
@@ -87,5 +88,8 @@ void showtime() {
     if (z1 < 1 << 16 || z2 < 1 << 16 || z3 < 1 << 16)
       return;
     fill_tri(x1, y1, x2, y2, x3, y3, polylist[i].clr);
+    bmp16_line(x1, y1, x2, y2, CLR_WHITE, back_buffer, SCREEN_WIDTH * 2);
+    bmp16_line(x3, y3, x2, y2, CLR_WHITE, back_buffer, SCREEN_WIDTH * 2);
+    bmp16_line(x1, y1, x3, y3, CLR_WHITE, back_buffer, SCREEN_WIDTH * 2);
   }
 }
