@@ -10,6 +10,7 @@ typedef u16 COLOR;
 #define INLINE static inline
 
 #define IWRAM_CODE __attribute__((section(".iwram"), long_call))
+#define IWRAM_VAR __attribute__((section(".iwram")))
 #define ARM_CODE __attribute__((target("arm")))
 
 #define SCREEN_WIDTH 160
@@ -42,10 +43,22 @@ typedef u16 COLOR;
 #define REG_BG2X *(volatile s32 *)0x04000028
 #define REG_BG2Y *(volatile s32 *)0x0400002C
 
-#define REG_IME *(volatile s16 *)0x04000208
+#define REG_IME *(volatile u16 *)0x04000208
 
-#define REG_TM0D *(volatile s16 *)0x04000100
-#define REG_TM0CNT *(volatile s16 *)0x04000102
+#define REG_TM0D *(volatile u16 *)0x04000100
+#define REG_TM0CNT *(volatile u16 *)0x04000102
+
+#define REG_KEYINPUT *(volatile u16 *)0x04000130
+#define KEY_A 0x1
+#define KEY_B 0x2
+#define KEY_SELECT 0x4
+#define KEY_START 0x8
+#define KEY_RIGHT 0x10
+#define KEY_LEFT 0x20
+#define KEY_UP 0x40
+#define KEY_DOWN 0x80
+#define KEY_R 0x100
+#define KEY_L 0x200
 
 INLINE COLOR RGB15(u32 red, u32 green, u32 blue) {
   return red | (green << 5) | (blue << 10);

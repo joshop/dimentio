@@ -19,11 +19,17 @@ typedef struct {
 } MODEL;
 #define VECLIST_BASE ((VEC3 *)0x02010000)
 #define VECLIST_TEST 0x00010000
+#define FLEX_WIDTH 320
+#define FLEX_HEIGHT 16
 // todo: figure out a way to make sure the veclist stays open
 #define FOVSCALEX SCREEN_HEIGHT
 #define FOVSCALEY SCREEN_WIDTH
 extern POLY polylist[256];
 extern int num_polys;
+extern int num_culled_polys;
+extern int proj_xs[64];
+extern int proj_ys[64];
+extern int do_bfc;
 extern VEC3 *veclist_end;
 void clear_lists();                          // clears the vector and poly lists
 void push_vec(VEC3 vec);                     // adds the vec to veclist
@@ -32,4 +38,5 @@ void push_model(MODEL model, VEC3 position); // adds the model to the list
 void project();              // projects all vectors into screen space
 void translate(VEC3 camera); // translates all vectors to camera
 void rot_matrix(s32 *matrix, int yaw, int pitch, int roll); // generate rot mat
-void showtime();                                            // it's showtime
+void cull_polys(); // backface cull and remove too close/behind polys
+void showtime();   // it's showtime

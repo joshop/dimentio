@@ -74,7 +74,8 @@ void bmp16_line(int y1, int x1, int y2, int x2, u32 clr, void *dstBase,
   t = a;                                                                       \
   a = b;                                                                       \
   b = t
-void draw_span(int x1, int x2, int y, COLOR *flex, int rootx, int rooty) {
+void IWRAM_CODE ARM_CODE draw_span(int x1, int x2, int y, COLOR *flex,
+                                   int rootx, int rooty) {
   int t;
   if (y < 0 || y >= SCREEN_HEIGHT)
     return;
@@ -90,44 +91,29 @@ void draw_span(int x1, int x2, int y, COLOR *flex, int rootx, int rooty) {
     SWAP_T(x1, x2);
   }
   if ((u32)flex < 0x10000) {
-    memset16(back_buffer + (y * SCREEN_WIDTH + x1), (u16)flex, x2 - x1);
+    memset16(back_buffer + (y * SCREEN_WIDTH + x1), (u16)(u32)flex, x2 - x1);
     return;
   }
-  // memset16(back_buffer + (y * SCREEN_WIDTH + x1), color, x2 - x1);
-  // COLOR *flex_point = &(flex[(y - rooty) & 0xf][(x1 - rootx) & 0xf]);
   COLOR *flex_point =
-      ((COLOR *)flex) + 32 * ((y - rooty) & 0xf) + ((x1 - rootx) & 0xf);
-  int remvals = x2 - x1;
-  while (remvals > 16) {
-    memcpy16(back_buffer + (y * SCREEN_WIDTH + x1), flex_point, 16);
-    x1 += 16;
-    remvals -= 16;
-  }
-  memcpy16(back_buffer + (y * SCREEN_WIDTH + x1), flex_point, remvals);
+      ((COLOR *)flex) + FLEX_WIDTH * ((y - rooty) & 0xf) + ((x1 - rootx) & 0xf);
+  memcpy16(back_buffer + (y * SCREEN_WIDTH + x1), flex_point, x2 - x1);
 }
-void fill_tri(int y1, int x1, int y2, int x2, int y3, int x3, COLOR *color) {
+void IWRAM_CODE ARM_CODE fill_tri2(int y1, int x1, int y2, int x2, int y3,
+                                   int x3, COLOR *color) {
   int t;
   s32 s1, s2, s3;
-  s32 ss, se;
-  s32 start, end;
-  int xmid;
-  int xa, xb;
-  int y;
-  int rootx, rooty;
+  int rootx = 0;
+  int rooty = 0;
   if (x1 < -SCREEN_WIDTH || x1 > 2 * SCREEN_WIDTH || x2 < -SCREEN_WIDTH ||
       x2 > 2 * SCREEN_WIDTH || x3 < -SCREEN_WIDTH || x3 > 2 * SCREEN_WIDTH ||
       y1 < -SCREEN_HEIGHT || y1 > 2 * SCREEN_HEIGHT || y2 < -SCREEN_HEIGHT ||
       y2 > 2 * SCREEN_HEIGHT || y3 < -SCREEN_HEIGHT || y3 > 2 * SCREEN_HEIGHT) {
-    // todo: this is a little sketchy, and could become obviously so eventually
-    // figure out actually why this is necessary, and how to fix it
     return;
   }
-  rootx = (x1 + x2 + x3) / 3;
-  rooty = (y1 + y2 + y3) / 3;
-  //  envision the triangle as a long side and two short sides
-  //  the long side is the one from the top pt to the bottom pt
-  //  the other part contains a breakpoint where the direction changes
-  //  sort points first, top to bottom
+  if ((u32)color > 0x10000) {
+    rootx = (x1 + x2 + x3) / 3;
+    rooty = (y1 + y2 + y3) / 3;
+  }
   if (y1 > y2) {
     SWAP_T(x1, x2);
     SWAP_T(y1, y2);
@@ -140,74 +126,32 @@ void fill_tri(int y1, int x1, int y2, int x2, int y3, int x3, COLOR *color) {
     SWAP_T(x1, x2);
     SWAP_T(y1, y2);
   }
-  y = y1;
-  start = int_fixed(x1);
-  end = start;
-  // start and end are bounds for our slice
-  // if (y1 == y2 || y1 == y3 || y2 == y3) return;
   if (y1 == y3)
     return;
   s1 = y1 == y2 ? 0 : fixed_div(int_fixed(x2 - x1), int_fixed(y2 - y1));
   s3 = fixed_div(int_fixed(x3 - x1), int_fixed(y3 - y1));
   s2 = y3 == y2 ? 0 : fixed_div(int_fixed(x3 - x2), int_fixed(y3 - y2));
-  // the slopes for each segment
-  if (y1 == y2) {
-    // hardcode case
-    if (x1 < x2) {
-      start = int_fixed(x1);
-      end = int_fixed(x2);
-    } else {
-      start = int_fixed(x2);
-      end = int_fixed(x1);
-    }
-    while (y < y3) {
-      xa = fixed_int(start);
-      xb = fixed_int(end);
-      // s1 is A to B, that's bad
-      // s3 is A to C
-      // s2 is B to C
-      draw_span(xa, xb, y, color, rootx, rooty);
-      start += (x1 < x2 ? s3 : s2);
-      end += (x1 < x2 ? s2 : s3);
-      y++;
+  if (y1 != y2) {
+    s32 xa, xb;
+    xa = x1 << 16;
+    xb = x1 << 16;
+    for (int y = y1; y < y2; y++) {
+      draw_span(xa >> 16, xb >> 16, y, color, rootx, rooty);
+      xa += s1;
+      xb += s3;
     }
   }
-  // xmid is the x coordinate of the long side, at the middle point
-  xmid = x1 + fixed_int(fixed_mul(s3, int_fixed(y2 - y1)));
-
-  // if xmid is less than x2, end sees the break point
-  // else, start will see it
-  if (xmid < x2) {
-    se = s1;
-    ss = s3;
-  } else {
-    se = s3;
-    ss = s1;
-  }
-  // when we hit y = y2, we're at the break point
-  // we want to set the one that was s1 to s2
-  // that will probably change the sign
-  // though not necessarily
-  while (y < y3) {
-    if (y == y2) {
-      if (xmid < x2) {
-        se = s2;
-      } else {
-        ss = s2;
-      }
+  if (y2 != y3) {
+    s32 xa, xb;
+    xa = x3 << 16;
+    xb = x3 << 16;
+    for (int y = y3; y >= y2; y--) {
+      draw_span(xa >> 16, xb >> 16, y, color, rootx, rooty);
+      xa -= s2;
+      xb -= s3;
     }
-    // fill from start to end
-    // todo: don't do as much bounds checking
-    xa = fixed_int(start);
-    xb = fixed_int(end);
-    draw_span(xa, xb, y, color, rootx, rooty);
-    start += ss;
-    end += se;
-    y++;
   }
-  /*draw_line(x1, y1, x2, y2, 191);// 0xe0);
-  draw_line(x2, y2, x3, y3, 191);// 0xe0);
-  draw_line(x1, y1, x3, y3, 191);// 0xe0);*/
+  // fill_tri2top
 }
 u32 digits[12] = {0xF999F, 0xF2262, 0xF8F1F, 0xF1F1F, 0x11F99, 0xF1F8F,
                   0xF9F8F, 0x1111F, 0xF9F9F, 0xF1F9F, 0x88F8F, 0x88F9F};
@@ -215,7 +159,8 @@ void show_digit(int digit, int x, int y) {
   u32 pattern = digits[digit];
   for (int i = 0; i < 5; i++) {
     for (int j = 0; j < 4; j++) {
-      plot_pixel(x - j, y + i, (pattern & 1) ? CLR_WHITE : CLR_BLACK);
+      if (pattern & 1)
+        plot_pixel(x - j, y + i, CLR_WHITE);
       pattern >>= 1;
     }
   }
