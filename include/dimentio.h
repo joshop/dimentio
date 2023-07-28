@@ -20,7 +20,7 @@ typedef struct {
 #define VECLIST_BASE ((VEC3 *)0x02010000)
 #define VECLIST_TEST 0x00010000
 #define FLEX_WIDTH 320
-#define FLEX_HEIGHT 16
+#define FLEX_HEIGHT 32
 // todo: figure out a way to make sure the veclist stays open
 #define FOVSCALEX SCREEN_HEIGHT
 #define FOVSCALEY SCREEN_WIDTH

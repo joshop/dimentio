@@ -72,7 +72,7 @@ void bmp16_line(int y1, int x1, int y2, int x2, u32 clr, void *dstBase,
     }
   }
 }
-
+#define FLEX_MASK 0x1f
 #define SWAP_T(a, b)                                                           \
   t = a;                                                                       \
   a = b;                                                                       \
@@ -97,8 +97,8 @@ void IWRAM_CODE ARM_CODE draw_span(int x1, int x2, int y, COLOR *flex,
     memset16(back_buffer + (y * SCREEN_WIDTH + x1), (u16)(u32)flex, x2 - x1);
     return;
   }
-  COLOR *flex_point =
-      ((COLOR *)flex) + FLEX_WIDTH * ((y - rooty) & 0xf) + ((x1 - rootx) & 0xf);
+  COLOR *flex_point = ((COLOR *)flex) + FLEX_WIDTH * ((y - rooty) & FLEX_MASK) +
+                      ((x1 - rootx) & FLEX_MASK);
   memcpy16(back_buffer + (y * SCREEN_WIDTH + x1), flex_point, x2 - x1);
 }
 void IWRAM_CODE ARM_CODE fill_tri2(int y1, int x1, int y2, int x2, int y3,
@@ -114,8 +114,8 @@ void IWRAM_CODE ARM_CODE fill_tri2(int y1, int x1, int y2, int x2, int y3,
     return;
   }
   if ((u32)color > 0x10000) {
-    rootx = (x1 + x2 + x3) / 3;
-    rooty = (y1 + y2 + y3) / 3;
+    rootx = (x1 + x2 + x3) / 3 - 16;
+    rooty = (y1 + y2 + y3) / 3 - 16;
   }
   if (y1 > y2) {
     SWAP_T(x1, x2);
