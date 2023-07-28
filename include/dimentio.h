@@ -35,8 +35,10 @@ void clear_lists();                          // clears the vector and poly lists
 void push_vec(VEC3 vec);                     // adds the vec to veclist
 void push_poly(POLY poly);                   // adds the poly to the poly list
 void push_model(MODEL model, VEC3 position); // adds the model to the list
-void project();              // projects all vectors into screen space
-void translate(VEC3 camera); // translates all vectors to camera
+void push_model_xform(MODEL model, VEC3 position,
+                      s32 *matrix); // adds the model to the list, transformed
+void project();                     // projects all vectors into screen space
+void translate(VEC3 camera);        // translates all vectors to camera
 void rot_matrix(s32 *matrix, int yaw, int pitch, int roll); // generate rot mat
 void cull_polys(); // backface cull and remove too close/behind polys
 void showtime();   // it's showtime

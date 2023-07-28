@@ -9,6 +9,9 @@ INLINE void plot_pixel(int y, int x, COLOR clr) {
 void bmp16_line(int y1, int x1, int y2, int x2, u32 clr, void *dstBase,
                 u32 dstPitch) {
   int ii, dx, dy, xstep, ystep, dd;
+  if (x1 < 0 || x2 < 0 || y1 < 0 || y2 < 0 || x1 > SCREEN_WIDTH ||
+      x2 > SCREEN_WIDTH || y1 > SCREEN_HEIGHT || y2 > SCREEN_HEIGHT)
+    return;
   u16 *dst = (u16 *)(dstBase + y1 * dstPitch + x1 * 2);
   dstPitch /= 2;
 

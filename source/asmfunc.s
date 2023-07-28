@@ -114,8 +114,8 @@ memcpy32:
     .text
     .align  2
     .code   16
-    .thumb_func
     .global memcpy16
+    .thumb_func
     .type   memcpy16 STT_FUNC
 memcpy16:
     push    {r4, lr}

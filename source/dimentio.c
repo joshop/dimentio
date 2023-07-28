@@ -1,4 +1,5 @@
 #include "dimentio.h"
+#include "asmfunc.h"
 #include "graphics.h"
 #include "triglut.h"
 #include <stdlib.h>
@@ -22,7 +23,31 @@ void push_model(MODEL model, VEC3 position) {
     (veclist_end - 1)->z += position.z;
   }
   for (int i = 0; i < model.num_polys; i++) {
-    // for (int i = 8; i < 12; i++) {
+    push_poly(model.polys[i]);
+    polylist[num_polys - 1].v1 += vec_offset;
+    polylist[num_polys - 1].v2 += vec_offset;
+    polylist[num_polys - 1].v3 += vec_offset;
+  }
+}
+void push_model_xform(MODEL model, VEC3 position, s32 *matrix) {
+  // copy vectors at the start to the end
+  memcpy32(veclist_end, VECLIST_BASE, 3 * model.num_vecs);
+  VEC3 *og_veclist_end = veclist_end;
+  int vec_offset = veclist_end - VECLIST_BASE;
+  veclist_end = VECLIST_BASE;
+  for (int i = 0; i < model.num_vecs; i++) {
+    push_vec(model.vecs[i]);
+  }
+  matmul(matrix, veclist_end);
+  for (int i = 0; i < model.num_vecs; i++) {
+    VEC3 og = og_veclist_end[i];
+    og_veclist_end[i] = VECLIST_BASE[i];
+    VECLIST_BASE[i].x += position.x;
+    VECLIST_BASE[i].y += position.x;
+    VECLIST_BASE[i].z += position.x;
+    VECLIST_BASE[i] = og;
+  }
+  for (int i = 0; i < model.num_polys; i++) {
     push_poly(model.polys[i]);
     polylist[num_polys - 1].v1 += vec_offset;
     polylist[num_polys - 1].v2 += vec_offset;
@@ -135,8 +160,8 @@ void IWRAM_CODE ARM_CODE showtime() {
 
     fill_tri2(px1, py1, px2, py2, px3, py3,
               polylist[i].clr); // polylist[i].clr
-    // bmp16_line(px1, py1, px2, py2, CLR_WHITE, back_buffer, SCREEN_WIDTH * 2);
-    // bmp16_line(px3, py3, px2, py2, CLR_WHITE, back_buffer, SCREEN_WIDTH * 2);
-    // bmp16_line(px1, py1, px3, py3, CLR_WHITE, back_buffer, SCREEN_WIDTH * 2);
+    bmp16_line(px1, py1, px2, py2, CLR_WHITE, back_buffer, SCREEN_WIDTH * 2);
+    bmp16_line(px3, py3, px2, py2, CLR_WHITE, back_buffer, SCREEN_WIDTH * 2);
+    bmp16_line(px1, py1, px3, py3, CLR_WHITE, back_buffer, SCREEN_WIDTH * 2);
   }
 }

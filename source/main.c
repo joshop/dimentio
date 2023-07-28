@@ -20,6 +20,24 @@ POLY cube_polys[] = {
     {2, 3, 7, checker_flex}, {2, 7, 6, checker_flex}, {0, 2, 6, checker_flex},
     {0, 6, 4, checker_flex}, {1, 7, 3, checker_flex}, {1, 5, 7, checker_flex}};
 MODEL cube_model = {8, 12, cube_vecs, cube_polys};
+
+VEC3 icosa_vecs[] = {
+    {0x0, -0x8696, 0xd9c4},  {0xd9c4, 0x0, 0x8696},  {0xd9c4, 0x0, -0x8696},
+    {-0xd9c4, 0x0, -0x8696}, {-0xd9c4, 0x0, 0x8696}, {-0x8696, 0xd9c4, 0x0},
+    {0x8696, 0xd9c4, 0x0},   {0x8696, -0xd9c4, 0x0}, {-0x8696, -0xd9c4, 0x0},
+    {0x0, -0x8696, -0xd9c4}, {0x0, 0x8696, -0xd9c4}, {0x0, 0x8696, 0xd9c4}};
+POLY icosa_polys[] = {
+    {1, 6, 2, (COLOR *)CLR_BLUE},  {1, 2, 7, (COLOR *)CLR_BLUE},
+    {3, 5, 4, (COLOR *)CLR_BLUE},  {4, 8, 3, (COLOR *)CLR_BLUE},
+    {6, 11, 5, (COLOR *)CLR_BLUE}, {5, 10, 6, (COLOR *)CLR_BLUE},
+    {9, 2, 10, (COLOR *)CLR_BLUE}, {10, 3, 9, (COLOR *)CLR_BLUE},
+    {7, 9, 8, (COLOR *)CLR_BLUE},  {8, 0, 7, (COLOR *)CLR_BLUE},
+    {11, 1, 0, (COLOR *)CLR_BLUE}, {0, 4, 11, (COLOR *)CLR_BLUE},
+    {6, 10, 2, (COLOR *)CLR_BLUE}, {1, 11, 6, (COLOR *)CLR_BLUE},
+    {3, 10, 5, (COLOR *)CLR_BLUE}, {5, 11, 4, (COLOR *)CLR_BLUE},
+    {2, 9, 7, (COLOR *)CLR_BLUE},  {7, 0, 1, (COLOR *)CLR_BLUE},
+    {3, 8, 9, (COLOR *)CLR_BLUE},  {4, 0, 8, (COLOR *)CLR_BLUE}};
+MODEL icosa_model = {12, 20, icosa_vecs, icosa_polys};
 u16 key_state;
 #define NUMAVGDIFFS 20
 int main() {
@@ -27,9 +45,9 @@ int main() {
   int tPitch = 0;
   int tYaw = 64;
   int tRoll = 0;
-  int ctrlMode = 0;
   int oldSelect = 0;
   s32 rotMatrix[] = {1 << 16, 0, 0, 0, 1 << 16, 0, 0, 0, 1 << 16};
+  s32 rotMatrix2[9];
   VEC3 camPos = {-0x80000, 0, 0};
   VEC3 origin = {0, 0, 0};
   VEC3 origin2 = {0, 0, 0x30000};
@@ -48,6 +66,7 @@ int main() {
   int avg_diffs[NUMAVGDIFFS];
   int avgi = 0;
   s32 movespeed = 0x2000;
+  int spinny = 0;
   while (1) {
     if (REG_TM0D > old_tval) {
       time_diff = REG_TM0D - old_tval;
@@ -87,10 +106,13 @@ int main() {
     oldSelect = key_state & KEY_SELECT;
     clear_lists();
 
-    push_model(cube_model, origin);
-    push_model(cube_model, origin2);
-    push_model(cube_model, origin3);
-    push_model(cube_model, origin4);
+    // push_model(cube_model, origin);
+    // push_model(cube_model, origin2);
+    // push_model(cube_model, origin3);
+    // push_model(cube_model, origin4);
+    rot_matrix(rotMatrix2, spinny & 0xff, spinny & 0xff, spinny & 0xff);
+    spinny++;
+    push_model_xform(icosa_model, origin, rotMatrix2);
     translate(camPos);
     rot_matrix(rotMatrix, (-tRoll) & 0xff, (-tYaw) & 0xff, (-tPitch) & 0xff);
     matmul(rotMatrix, veclist_end);
