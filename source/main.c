@@ -1,5 +1,8 @@
 #include "asmfunc.h"
+#include "bestovius.h"
 #include "bmp.h"
+#include "bmp_files.h"
+#include "collision.h"
 #include "dimentio.h"
 #include "graphics.h"
 #include "helper.h"
@@ -8,27 +11,27 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-VEC3 cube_vecs[] = {
+const VEC3 cube_vecs[] = {
     {1 << 16, 1 << 16, 1 << 16},   {1 << 16, 1 << 16, -1 << 16},
     {1 << 16, -1 << 16, 1 << 16},  {1 << 16, -1 << 16, -1 << 16},
     {-1 << 16, 1 << 16, 1 << 16},  {-1 << 16, 1 << 16, -1 << 16},
     {-1 << 16, -1 << 16, 1 << 16}, {-1 << 16, -1 << 16, -1 << 16}};
 COLOR checker_flex[FLEX_WIDTH * FLEX_HEIGHT];
-extern const COLOR *bmp_papermario;
-POLY cube_polys[] = {
+
+const POLY cube_polys[] = {
     {0, 1, 3, checker_flex}, {0, 3, 2, checker_flex}, {4, 7, 5, checker_flex},
     {4, 6, 7, checker_flex}, {0, 5, 1, checker_flex}, {0, 4, 5, checker_flex},
     {2, 3, 7, checker_flex}, {2, 7, 6, checker_flex}, {0, 2, 6, checker_flex},
     {0, 6, 4, checker_flex}, {1, 7, 3, checker_flex}, {1, 5, 7, checker_flex}};
-MODEL cube_model = {8, 12, cube_vecs, cube_polys};
+const MODEL cube_model = {8, 12, cube_vecs, cube_polys};
 
-VEC3 icosa_vecs[] = {
+const VEC3 icosa_vecs[] = {
     {0x0, -0x8696, 0xd9c4},  {0xd9c4, 0x0, 0x8696},  {0xd9c4, 0x0, -0x8696},
     {-0xd9c4, 0x0, -0x8696}, {-0xd9c4, 0x0, 0x8696}, {-0x8696, 0xd9c4, 0x0},
     {0x8696, 0xd9c4, 0x0},   {0x8696, -0xd9c4, 0x0}, {-0x8696, -0xd9c4, 0x0},
     {0x0, -0x8696, -0xd9c4}, {0x0, 0x8696, -0xd9c4}, {0x0, 0x8696, 0xd9c4}};
 #define icosa_flex (COLOR *)&bmp_papermario
-POLY icosa_polys[] = {
+const POLY icosa_polys[] = {
     {1, 6, 2, icosa_flex},  {1, 2, 7, icosa_flex},  {3, 5, 4, icosa_flex},
     {4, 8, 3, icosa_flex},  {6, 11, 5, icosa_flex}, {5, 10, 6, icosa_flex},
     {9, 2, 10, icosa_flex}, {10, 3, 9, icosa_flex}, {7, 9, 8, icosa_flex},
@@ -36,22 +39,53 @@ POLY icosa_polys[] = {
     {6, 10, 2, icosa_flex}, {1, 11, 6, icosa_flex}, {3, 10, 5, icosa_flex},
     {5, 11, 4, icosa_flex}, {2, 9, 7, icosa_flex},  {7, 0, 1, icosa_flex},
     {3, 8, 9, icosa_flex},  {4, 0, 8, icosa_flex}};
-MODEL icosa_model = {12, 20, icosa_vecs, icosa_polys};
+const MODEL icosa_model = {12, 20, icosa_vecs, icosa_polys};
+
+const VEC3 hexagon_vecs[] = {{0x0, 0x0, 0x0},
+                             {0x10000 * 4, 0x0, 0x0},
+                             {0x8000 * 4, 0x0, 0xddb3 * 4},
+                             {-0x8000 * 4, 0x0, 0xddb3 * 4},
+                             {-0x10000 * 4, 0x0, 0x0},
+                             {-0x8000 * 4, 0x0, -0xddb3 * 4},
+                             {0x8000 * 4, 0x0, -0xddb3 * 4}};
+const POLY hexagon_polys[] = {
+    {0, 2, 1, (COLOR *)&bmp_grass, 17}, {0, 3, 2, (COLOR *)&bmp_grass, 17},
+    {0, 4, 3, (COLOR *)&bmp_grass, 17}, {0, 5, 4, (COLOR *)&bmp_grass, 17},
+    {0, 6, 5, (COLOR *)&bmp_grass, 17}, {0, 1, 6, (COLOR *)&bmp_grass, 17}};
+const MODEL hexagon_model = {7, 6, hexagon_vecs, hexagon_polys};
 u16 key_state;
-extern const COLOR *bmp_background;
+void slowmatmul(s32 *matrix, VEC3 *vectors) {
+  VEC3 *vec;
+  VEC3 newvec;
+  for (vec = vectors - 1; (s32)vec & VECLIST_TEST; vec--) {
+    newvec.x = fixed_mul(vec->x, matrix[0]) + fixed_mul(vec->y, matrix[1]) +
+               fixed_mul(vec->z, matrix[2]);
+    newvec.y = fixed_mul(vec->x, matrix[3]) + fixed_mul(vec->y, matrix[4]) +
+               fixed_mul(vec->z, matrix[5]);
+    newvec.z = fixed_mul(vec->x, matrix[6]) + fixed_mul(vec->y, matrix[7]) +
+               fixed_mul(vec->z, matrix[8]);
+    *vec = newvec;
+  }
+}
 #define NUMAVGDIFFS 20
 int main() {
   init_bmp();
   int tPitch = 0;
-  int tYaw = 64;
+  int tYaw = 0;
   int tRoll = 0;
   int oldSelect = 0;
   int oldStart = 0;
-  int useBG = 0;
+  int useBG = 1;
+  int useRealSprites = 1;
+  int camPose = 0;
+  do_bfc = 1;
+  do_wireframe = 0;
   s32 rotMatrix[] = {1 << 16, 0, 0, 0, 1 << 16, 0, 0, 0, 1 << 16};
   s32 rotMatrix2[9];
-  VEC3 camPos = {-0x30000, 0, 0};
-  VEC3 origin = {0, 0, 0};
+  VEC3 camPos = {0, 0x10000, -0x90000};
+  VEC3 origin = {0x000, 0, 1};
+  VEC3 origin2 = {0, 0, 0x30000};
+  VEC3 origin3 = {0, 0x30000, 0};
   REG_TM0CNT = 0x0082;
   for (int i = 0; i < FLEX_HEIGHT; i++) {
     for (int j = 0; j < FLEX_WIDTH; j++) {
@@ -64,13 +98,14 @@ int main() {
   int avg_diffs[NUMAVGDIFFS];
   int avgi = 0;
   s32 movespeed = 0x2000;
-  s32 iPitch = 0;
-  s32 iPitchV = 0;
-  s32 iYaw = 0;
-  s32 iYawV = 0;
-  s32 iRoll = 0;
-  s32 iRollV = 0;
-  int spinny = 0;
+  char buffer[128];
+  SPRITE marioSprite = {origin, 0xa, 16, 32, 0, 0x60000};
+  //  volatile SPRITE marioSprite;
+  //  temporary palette solution, not good design
+  COLOR marioPal[] = {0x0,    0x0,    0xa,    0x44c4, 0x30b6, 0xd71,  0x391f,
+                      0x4e08, 0x35df, 0x1e9b, 0x6770, 0x635f, 0x3b7f, 0x7fff};
+  memcpy16((COLOR *)0x05000200, &marioPal, 14);
+  // copy_bitmap((const u8 *)&bmps_mario, 0, 8);
   while (1) {
     if (REG_TM0D > old_tval) {
       time_diff = REG_TM0D - old_tval;
@@ -94,94 +129,127 @@ int main() {
     }
     if (key_state & KEY_LEFT) {
       // tYaw--;
-      iYawV += 0x1800;
+      marioSprite.position.x -= movespeed;
+
     } else if (key_state & KEY_RIGHT) {
       // tYaw++;
-      iYawV -= 0x1800;
+      marioSprite.position.x += movespeed;
     }
-    if (iYawV < 0x100 && iYawV > -0x100)
-      iYawV = 0;
-    else if (iYawV < 0)
-      iYawV -= iYawV >> 7;
-    else
-      iYawV += (-iYawV) >> 7;
-    iYaw += iYawV;
 
-    if (iPitchV < 0x100 && iPitchV > -0x100)
-      iPitchV = 0;
-    else if (iPitchV < 0)
-      iPitchV -= iPitchV >> 7;
-    else
-      iPitchV += (-iPitchV) >> 7;
-    iPitch += iPitchV;
-
-    if (iRollV < 0x100 && iRollV > -0x100)
-      iRollV = 0;
-    else if (iRollV < 0)
-      iRollV -= iRollV >> 7;
-    else
-      iRollV += (-iRollV) >> 7;
-    iRoll += iRollV;
     if (key_state & KEY_UP) {
       // camPos.x += fixed_mul(SIN_LUT[tYaw & 0xff], movespeed);
       // camPos.z += fixed_mul(COS_LUT[tYaw & 0xff], movespeed);
-      iPitchV -= 0x1800;
+      marioSprite.position.z += movespeed;
+
     } else if (key_state & KEY_DOWN) {
       // camPos.x -= fixed_mul(SIN_LUT[tYaw & 0xff], movespeed);
       // camPos.z -= fixed_mul(COS_LUT[tYaw & 0xff], movespeed);
-      iPitchV += 0x1800;
+      marioSprite.position.z -= movespeed;
+
     } else if (key_state & KEY_A) {
       camPos.y += movespeed;
     } else if (key_state & KEY_B) {
       camPos.y -= movespeed;
     }
     if (key_state & KEY_L) {
-      iRollV -= 0x1800;
+
+      tPitch--;
     } else if (key_state & KEY_R) {
-      iRollV += 0x1800;
+      tPitch++;
     }
     if ((key_state & KEY_SELECT) > oldSelect) {
-      do_bfc ^= 1;
+      // do_wireframe ^= 1;
+      camPose++;
+      if (camPose == 3)
+        camPose = 0;
+      switch (camPose) {
+      case 0:
+        camPos.x = 0;
+        camPos.y = 0x10000;
+        camPos.z = -0x90000;
+        tPitch = 0;
+        tYaw = 0;
+        tRoll = 0;
+        break;
+      case 1:
+        camPos.x = 0;
+        camPos.y = -0x90000;
+        camPos.z = 0;
+        tPitch = 192;
+        tYaw = 0;
+        tRoll = 0;
+        break;
+      case 2:
+        camPos.x = 0;
+        camPos.y = 0x28000;
+        camPos.z = -0x90000;
+        tPitch = 0;
+        tYaw = 0;
+        tRoll = 0;
+        break;
+      }
     }
     oldSelect = key_state & KEY_SELECT;
 
     if ((key_state & KEY_START) > oldStart) {
-      iYawV = 0;
-      iRollV = 0;
-      iPitchV = 0;
-      useBG ^= 1;
+      useRealSprites ^= 1;
     }
     oldStart = key_state & KEY_START;
+    step_mario_physics(&marioSprite);
+    init_oam();
     clear_lists();
 
     // push_model(cube_model, origin);
     // push_model(cube_model, origin2);
-    // push_model(cube_model, origin3);
+    push_model(hexagon_model, origin3);
     // push_model(cube_model, origin4);
-    rot_matrix(rotMatrix2, (iRoll >> 16) & 0xff, (iYaw >> 16) & 0xff,
-               (iPitch >> 16) & 0xff);
-    spinny++;
-    push_model_xform(icosa_model, origin, rotMatrix2);
+    // rot_matrix(rotMatrix2, (spinny >> 2) & 0xff, 0, 0);
+    // spinny++;
+    // push_model_xform(icosa_model, origin, rotMatrix2);
+    // push_model(cube_model, origin);
+    // push_model(cube_model, origin2);
+    prep_sprite(&marioSprite);
+    stop_right_there_criminal_scum(&marioSprite);
     translate(camPos);
-    rot_matrix(rotMatrix, (-tRoll) & 0xff, (-tYaw) & 0xff, (-tPitch) & 0xff);
+    rot_matrix(rotMatrix, (-tYaw) & 0xff, (-tPitch) & 0xff, (-tRoll) & 0xff);
+    /*posprintf(buffer, "%5d %5d %5d", rotMatrix[0] >> 8, rotMatrix[1] >> 8,
+              rotMatrix[2] >> 8);
+    show_string(buffer, 5, 7);
+    posprintf(buffer, "%5d %5d %5d", rotMatrix[3] >> 8, rotMatrix[4] >> 8,
+              rotMatrix[5] >> 8);
+    show_string(buffer, 5, 13);
+    posprintf(buffer, "%5d %5d %5d", rotMatrix[6] >> 8, rotMatrix[7] >> 8,
+              rotMatrix[8] >> 8);
+    show_string(buffer, 5, 19);*/
     matmul(rotMatrix, veclist_end);
     cull_polys();
     project();
     showtime();
+    push_sprite(&marioSprite);
+    if (onGround) {
+      copy_bitmap((const u8 *)&bmps_mario, 0, 8);
+    } else {
+      copy_bitmap((const u8 *)&bmps_mario_fall, 0, 8);
+    }
+    cap_oam();
 
-    show_number(65536 * NUMAVGDIFFS / total, 60, 8);
-    show_digit(10, 65, 8);
-    show_digit(11, 70, 8);
-    show_digit(5, 75, 8);
+    posprintf(buffer, "%3dFPS %d/%dTRIS %dVERTS", 65536 * NUMAVGDIFFS / total,
+              num_polys, num_culled_polys, veclist_end - VECLIST_BASE);
+    show_string(buffer, 5, 1);
 
-    show_number(num_polys, 60, 14);
-
-    show_number(num_culled_polys, 60, 20);
+    posprintf(buffer, "%l %l %l", marioSprite.position.x,
+              marioSprite.position.y, marioSprite.position.z);
+    show_string(buffer, 5, 7);
 
     // flip the buffers
     flip_buffers();
     // wait for the next vblank
+    // NOTE!! likely, mGBA isn't simulating OAM write blockin
+    // find a better emulator
     // wait_blank();
+    // OAM copy
+    if (useRealSprites)
+      memcpy32(OAM_BASE, oam_shadow, 256);
   }
 
   return 0;

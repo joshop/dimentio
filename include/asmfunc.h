@@ -5,3 +5,4 @@ void memset16(void *dst, u16 src, u32 hwn);
 void IWRAM_CODE ARM_CODE memcpy32(void *dst, const void *src, u32 wdcount);
 void memcpy16(void *dst, const void *src, u32 hwcount);
 void matmul(s32 *matrix, VEC3 *vectors);
+void posprintf(char *, const char *, ...);

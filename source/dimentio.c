@@ -1,12 +1,13 @@
 #include "dimentio.h"
 #include "asmfunc.h"
+#include "bestovius.h"
 #include "graphics.h"
 #include "triglut.h"
 #include <stdlib.h>
-POLY polylist[256];
+EWRAM_VAR POLY polylist[256];
 int num_polys = 0;
-int proj_xs[64];
-int proj_ys[64];
+EWRAM_VAR int proj_xs[64];
+EWRAM_VAR int proj_ys[64];
 VEC3 *veclist_end = VECLIST_BASE;
 void clear_lists() {
   num_polys = 0;
@@ -71,7 +72,7 @@ void translate(VEC3 cam) {
   }
 }
 void rot_matrix(s32 *matrix, int yaw, int pitch, int roll) {
-  matrix[0] = fixed_mul(COS_LUT[yaw], COS_LUT[pitch]);
+  /*matrix[0] = fixed_mul(COS_LUT[yaw], COS_LUT[pitch]);
   matrix[1] =
       fixed_mul(COS_LUT[yaw], fixed_mul(SIN_LUT[pitch], SIN_LUT[roll])) -
       fixed_mul(SIN_LUT[yaw], COS_LUT[roll]);
@@ -87,7 +88,20 @@ void rot_matrix(s32 *matrix, int yaw, int pitch, int roll) {
       fixed_mul(COS_LUT[yaw], SIN_LUT[roll]);
   matrix[6] = -SIN_LUT[pitch];
   matrix[7] = fixed_mul(COS_LUT[pitch], SIN_LUT[roll]);
-  matrix[8] = fixed_mul(COS_LUT[pitch], COS_LUT[roll]);
+  matrix[8] = fixed_mul(COS_LUT[pitch], COS_LUT[roll]);*/
+  matrix[0] = fixed_mul(COS_LUT[roll], COS_LUT[yaw]) -
+              fixed_mul(SIN_LUT[roll], fixed_mul(SIN_LUT[yaw], SIN_LUT[pitch]));
+  matrix[1] = -fixed_mul(SIN_LUT[roll], COS_LUT[pitch]);
+  matrix[2] = fixed_mul(COS_LUT[roll], SIN_LUT[yaw]) +
+              fixed_mul(SIN_LUT[roll], fixed_mul(COS_LUT[yaw], SIN_LUT[pitch]));
+  matrix[3] = fixed_mul(SIN_LUT[roll], COS_LUT[yaw]) +
+              fixed_mul(COS_LUT[roll], fixed_mul(SIN_LUT[yaw], SIN_LUT[pitch]));
+  matrix[4] = fixed_mul(COS_LUT[roll], COS_LUT[pitch]);
+  matrix[5] = fixed_mul(SIN_LUT[roll], SIN_LUT[yaw]) -
+              fixed_mul(COS_LUT[roll], fixed_mul(COS_LUT[yaw], SIN_LUT[pitch]));
+  matrix[6] = -fixed_mul(SIN_LUT[yaw], COS_LUT[pitch]);
+  matrix[7] = SIN_LUT[pitch];
+  matrix[8] = fixed_mul(COS_LUT[yaw], COS_LUT[pitch]);
 }
 int IWRAM_CODE ARM_CODE zsort(const void *poly1, const void *poly2) {
   if (((POLY *)poly1)->v1 == -1) {
@@ -97,14 +111,27 @@ int IWRAM_CODE ARM_CODE zsort(const void *poly1, const void *poly2) {
   if (((POLY *)poly2)->v1 == -1) {
     return -1;
   }
+  int tz1, tz2;
+
   int za1, za2, za3, zb1, zb2, zb3;
-  za1 = VECLIST_BASE[((POLY *)poly1)->v1].z;
-  za2 = VECLIST_BASE[((POLY *)poly1)->v2].z;
-  za3 = VECLIST_BASE[((POLY *)poly1)->v3].z;
-  zb1 = VECLIST_BASE[((POLY *)poly2)->v1].z;
-  zb2 = VECLIST_BASE[((POLY *)poly2)->v2].z;
-  zb3 = VECLIST_BASE[((POLY *)poly2)->v3].z;
-  return ((zb1 + zb2 + zb3) - (za1 + za2 + za3));
+  if (((POLY *)poly1)->v1 == -2) {
+    tz1 = VECLIST_BASE[((POLY *)poly1)->v2].z * 3;
+  } else {
+    za1 = VECLIST_BASE[((POLY *)poly1)->v1].z;
+    za2 = VECLIST_BASE[((POLY *)poly1)->v2].z;
+    za3 = VECLIST_BASE[((POLY *)poly1)->v3].z;
+    tz1 = za1 + za2 + za3;
+  }
+  if (((POLY *)poly2)->v1 == -2) {
+    tz2 = VECLIST_BASE[((POLY *)poly2)->v2].z * 3;
+  } else {
+    zb1 = VECLIST_BASE[((POLY *)poly2)->v1].z;
+    zb2 = VECLIST_BASE[((POLY *)poly2)->v2].z;
+    zb3 = VECLIST_BASE[((POLY *)poly2)->v3].z;
+    tz2 = zb1 + zb2 + zb3;
+  }
+  // return ((zb1 + zb2 + zb3) - (za1 + za2 + za3));
+  return tz2 - tz1;
 }
 extern u16 *back_buffer;
 int num_culled_polys;
@@ -112,6 +139,13 @@ int do_bfc = 0;
 void IWRAM_CODE ARM_CODE cull_polys() {
   num_culled_polys = num_polys;
   for (int i = 0; i < num_polys; i++) {
+    if (polylist[i].v1 == -2)
+      continue;
+    if (polylist[i].flags & 0x0004) {
+      num_culled_polys--;
+      polylist[i].v1 = -1;
+      continue;
+    }
     int x1, y1, x2, y2, x3, y3, z1, z2, z3;
     x1 = VECLIST_BASE[polylist[i].v1].x;
     x2 = VECLIST_BASE[polylist[i].v2].x;
@@ -146,10 +180,25 @@ void IWRAM_CODE ARM_CODE cull_polys() {
     }
   }
 }
+int do_wireframe = 0;
+int gregx, gregy;
 void IWRAM_CODE ARM_CODE showtime() {
   // num_polys = 2;
   qsort(polylist, num_polys, sizeof(POLY), &zsort);
   for (int i = 0; i < num_culled_polys; i++) {
+    /*if (polylist[i].v1 == -2) {
+      SPRITE *spr = ((SPRITE *)polylist[i].v3);
+      int px, py;
+      px = proj_xs[polylist[i].v2];
+      py = proj_ys[polylist[i].v2];
+      if (px < 0 || px >= 128 || py < 0 || py >= 160)
+        continue;
+      spr->qp1 = query_pixel(px, py);
+      // spr->qp2 = query_pixel(px + spr->width, py);
+      // spr->qp3 = query_pixel(px, py + spr->height);
+      // spr->qp4 = query_pixel(px + spr->width, py + spr->height);
+      continue;
+    }*/
     int px1, px2, px3, py1, py2, py3;
     px1 = proj_xs[polylist[i].v1];
     px2 = proj_xs[polylist[i].v2];
@@ -158,10 +207,13 @@ void IWRAM_CODE ARM_CODE showtime() {
     py2 = proj_ys[polylist[i].v2];
     py3 = proj_ys[polylist[i].v3];
 
-    fill_tri2(px1, py1, px2, py2, px3, py3,
-              polylist[i].clr); // polylist[i].clr
-    bmp16_line(px1, py1, px2, py2, CLR_WHITE, back_buffer, SCREEN_WIDTH * 2);
-    bmp16_line(px3, py3, px2, py2, CLR_WHITE, back_buffer, SCREEN_WIDTH * 2);
-    bmp16_line(px1, py1, px3, py3, CLR_WHITE, back_buffer, SCREEN_WIDTH * 2);
+    if (do_wireframe) {
+      bmp16_line(px1, py1, px2, py2, CLR_WHITE, back_buffer, SCREEN_WIDTH * 2);
+      bmp16_line(px3, py3, px2, py2, CLR_WHITE, back_buffer, SCREEN_WIDTH * 2);
+      bmp16_line(px1, py1, px3, py3, CLR_WHITE, back_buffer, SCREEN_WIDTH * 2);
+    } else {
+      fill_tri2(px1, py1, px2, py2, px3, py3, polylist[i].clr,
+                polylist[i].flags & 3); // polylist[i].clr
+    }
   }
 }

@@ -10,12 +10,19 @@ typedef struct {
   int v2;
   int v3;
   COLOR *clr;
+  int flags;
 } POLY;
+// poly flags:
+// -------- -------- -------- ---FWVRR
+// R root override (00: center, 01-11: vertex)
+// V invisible
+// W wall collision
+// F floor collision
 typedef struct {
   int num_vecs;
   int num_polys;
-  VEC3 *vecs;
-  POLY *polys;
+  const VEC3 *vecs;
+  const POLY *polys;
 } MODEL;
 #define VECLIST_BASE ((VEC3 *)0x02010000)
 #define VECLIST_TEST 0x00010000
@@ -30,6 +37,8 @@ extern int num_culled_polys;
 extern int proj_xs[64];
 extern int proj_ys[64];
 extern int do_bfc;
+extern int gregx, gregy;
+extern int do_wireframe;
 extern VEC3 *veclist_end;
 void clear_lists();                          // clears the vector and poly lists
 void push_vec(VEC3 vec);                     // adds the vec to veclist
@@ -40,5 +49,6 @@ void push_model_xform(MODEL model, VEC3 position,
 void project();                     // projects all vectors into screen space
 void translate(VEC3 camera);        // translates all vectors to camera
 void rot_matrix(s32 *matrix, int yaw, int pitch, int roll); // generate rot mat
-void cull_polys(); // backface cull and remove too close/behind polys
-void showtime();   // it's showtime
+void IWRAM_CODE ARM_CODE
+cull_polys(); // backface cull and remove too close/behind polys
+void IWRAM_CODE ARM_CODE showtime(); // it's showtime

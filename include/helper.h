@@ -11,6 +11,7 @@ typedef u16 COLOR;
 
 #define IWRAM_CODE __attribute__((section(".iwram"), long_call))
 #define IWRAM_VAR __attribute__((section(".iwram")))
+#define EWRAM_VAR __attribute__((section(".ewram")))
 #define ARM_CODE __attribute__((target("arm")))
 
 #define SCREEN_WIDTH 160
@@ -34,6 +35,7 @@ typedef u16 COLOR;
 #define DCNT_BG3 0x0800
 #define DCNT_OBJ 0x1000
 #define DCNT_PAGEFLIP 0x0010
+#define DCNT_OBJ_1D 0x0040
 
 #define REG_BG2CNT *(volatile u16 *)0x0400000C
 #define REG_BG2PA *(volatile s16 *)0x04000020
@@ -77,6 +79,8 @@ INLINE COLOR RGB15(u32 red, u32 green, u32 blue) {
 #define CLR_MAG 0x7C1F
 #define CLR_CYAN 0x7FE0
 #define CLR_WHITE 0x7FFF
+
+#define OAM_BASE ((u16 *)0x07000000)
 
 INLINE s32 fixed_mul(s32 a, s32 b) { return ((long long)a * b) >> 16; }
 INLINE s32 fixed_div(s32 a, s32 b) { return ((long long)a << 16) / b; }

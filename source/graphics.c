@@ -2,9 +2,11 @@
 #include "bmp.h"
 #include "dimentio.h"
 #include "helper.h"
-INLINE void plot_pixel(int y, int x, COLOR clr) {
+void plot_pixel(int y, int x, COLOR clr) {
   back_buffer[y * SCREEN_WIDTH + x] = clr;
 }
+
+COLOR query_pixel(int y, int x) { return back_buffer[y * SCREEN_WIDTH + x]; }
 
 void bmp16_line(int y1, int x1, int y2, int x2, u32 clr, void *dstBase,
                 u32 dstPitch) {
@@ -102,7 +104,7 @@ void IWRAM_CODE ARM_CODE draw_span(int x1, int x2, int y, COLOR *flex,
   memcpy16(back_buffer + (y * SCREEN_WIDTH + x1), flex_point, x2 - x1);
 }
 void IWRAM_CODE ARM_CODE fill_tri2(int y1, int x1, int y2, int x2, int y3,
-                                   int x3, COLOR *color) {
+                                   int x3, COLOR *color, int rootO) {
   int t;
   s32 s1, s2, s3;
   int rootx = 0;
@@ -114,8 +116,24 @@ void IWRAM_CODE ARM_CODE fill_tri2(int y1, int x1, int y2, int x2, int y3,
     return;
   }
   if ((u32)color > 0x10000) {
-    rootx = (x1 + x2 + x3) / 3 - 16;
-    rooty = (y1 + y2 + y3) / 3 - 16;
+    switch (rootO) {
+    case 0:
+      rootx = (x1 + x2 + x3) / 3 - 16;
+      rooty = (y1 + y2 + y3) / 3 - 16;
+      break;
+    case 1:
+      rootx = x1 - 16;
+      rooty = y1 - 16;
+      break;
+    case 2:
+      rootx = x2 - 16;
+      rooty = y2 - 16;
+      break;
+    case 3:
+      rootx = x3 - 16;
+      rooty = y3 - 16;
+      break;
+    }
   }
   if (y1 > y2) {
     SWAP_T(x1, x2);
@@ -156,10 +174,31 @@ void IWRAM_CODE ARM_CODE fill_tri2(int y1, int x1, int y2, int x2, int y3,
   }
   // fill_tri2top
 }
-u32 digits[12] = {0xF999F, 0xF2262, 0xF8F1F, 0xF1F1F, 0x11F99, 0xF1F8F,
-                  0xF9F8F, 0x1111F, 0xF9F9F, 0xF1F9F, 0x88F8F, 0x88F9F};
-void show_digit(int digit, int x, int y) {
-  u32 pattern = digits[digit];
+/*
+0000
+...0 CF
+..0.
+.0.. 5F
+0000
+
+*/
+// u32 digits[12] = {0xF999F, 0xF2262, 0xF8F1F, 0xF1F1F, 0x11F99, 0xF1F8F,
+//                   0xF9F8F, 0x1111F, 0xF9F9F, 0xF1F9F, 0x88F8F, 0x88F9F};
+const u32 ascii_glyph[128] = {
+    0x00000, 0x00000, 0x00000, 0x00000, 0x00000, 0x00000, 0x00000, 0x00000,
+    0x00000, 0x00000, 0x00000, 0x00000, 0x00000, 0x00000, 0x00000, 0x00000,
+    0x00000, 0x00000, 0x00000, 0x00000, 0x00000, 0x00000, 0x00000, 0x00000,
+    0x00000, 0x00000, 0x00000, 0x00000, 0x00000, 0x00000, 0x00000, 0x00000,
+    0x00000, 0x40444, 0x00099, 0xAFAFA, 0xF5FCF, 0xA42A0, 0x00000, 0x00011,
+    0x48884, 0x21112, 0x00525, 0x04E40, 0x84000, 0x00F00, 0x33000, 0x84210,
+    0xF999F, 0xF2262, 0xF8F1F, 0xF1F1F, 0x11F99, 0xF1F8F, 0xF9F8F, 0x1111F,
+    0xF9F9F, 0xF1F9F, 0x04040, 0x84040, 0x12421, 0x0F0F0, 0x84248, 0x4071F,
+    0xFBB8F, 0x99F9F, 0xF9FAE, 0xF888F, 0xE999E, 0xF8E8F, 0x88E8F, 0xF9B8F,
+    0x99F99, 0xF444F, 0xC444F, 0x9ACA9, 0xF8888, 0x999FF, 0x9BDD9, 0xF999F,
+    0x88F9F, 0xFB99F, 0x9AF9F, 0xF1F8F, 0x4444F, 0xF9999, 0x25999, 0xFF999,
+    0x55255, 0x22255, 0xF421F};
+void show_glyph(int glyph, int x, int y) {
+  u32 pattern = ascii_glyph[glyph];
   for (int i = 0; i < 5; i++) {
     for (int j = 0; j < 4; j++) {
       if (pattern & 1)
@@ -168,6 +207,7 @@ void show_digit(int digit, int x, int y) {
     }
   }
 }
+/*
 void show_number(u32 number, int x, int y) {
   if (number == 0) {
     show_digit(0, x, y);
@@ -177,5 +217,11 @@ void show_number(u32 number, int x, int y) {
     show_digit(number % 10, x, y);
     number /= 10;
     x -= 5;
+  }
+}*/
+void show_string(const char *str, int x, int y) {
+  for (; *str; str++) {
+    show_glyph(*str, x, y);
+    x += 5;
   }
 }

@@ -15,7 +15,7 @@ void wait_blank() {
 }
 
 void init_bmp() {
-  REG_DISPCNT = DCNT_MODE5 | DCNT_BG2 | DCNT_PAGEFLIP;
+  REG_DISPCNT = DCNT_MODE5 | DCNT_BG2 | DCNT_PAGEFLIP | DCNT_OBJ | DCNT_OBJ_1D;
   REG_BG2X = 0;
   REG_BG2Y = 0;
   REG_BG2PA = 0;
